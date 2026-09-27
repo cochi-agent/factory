@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 from factory.plugin import Plugin
@@ -65,7 +66,14 @@ def _load_plugin_file(path: Path) -> Plugin:
     if spec is None or spec.loader is None:
         raise ResolvePluginError(f"cannot load plugin from {path}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Register before executing: postponed-annotation dataclasses in the
+    # plugin consult sys.modules during class creation.
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(spec.name, None)
+        raise
     descriptor = getattr(module, "PLUGIN", None)
     if not isinstance(descriptor, Plugin):
         raise ResolvePluginError(

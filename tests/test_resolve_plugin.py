@@ -69,6 +69,28 @@ def test_resolve_plugin_does_not_search_recursively(tmp_path: Path) -> None:
         resolve_plugin("github", (tmp_path,))
 
 
+def test_resolve_plugin_loads_postponed_annotation_dataclass_plugin(
+    tmp_path: Path,
+) -> None:
+    tmp_path.joinpath("github.py").write_text(
+        "from __future__ import annotations\n"
+        "from dataclasses import dataclass\n"
+        "from factory.plugin import Plugin\n"
+        "\n"
+        "\n"
+        "@dataclass(frozen=True)\n"
+        "class MyUnit:\n"
+        "    name: str\n"
+        "\n"
+        "\n"
+        'PLUGIN = Plugin(name="github", units=(MyUnit(name="u1"),))\n',
+        encoding="utf-8",
+    )
+    plugin = resolve_plugin("github", (tmp_path,))
+    assert plugin.name == "github"
+    assert len(plugin.units) == 1
+
+
 def test_errors_share_a_common_base() -> None:
     for error in (PluginNotFoundError, AmbiguousPluginError, PluginNameMismatchError):
         assert issubclass(error, ResolvePluginError)
